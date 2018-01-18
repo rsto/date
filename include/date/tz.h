@@ -1943,39 +1943,6 @@ operator<<(std::basic_ostream<CharT, Traits>& os, const utc_time<Duration>& t)
     return to_stream(os, fmt, t);
 }
 
-template <class Duration, class CharT, class Traits, class Alloc = std::allocator<CharT>>
-std::basic_istream<CharT, Traits>&
-from_stream(std::basic_istream<CharT, Traits>& is, const CharT* fmt,
-            utc_time<Duration>& tp, std::basic_string<CharT, Traits, Alloc>* abbrev = nullptr,
-            std::chrono::minutes* offset = nullptr)
-{
-    using namespace std;
-    using namespace std::chrono;
-    using CT = typename common_type<Duration, seconds>::type;
-    minutes offset_local{};
-    auto offptr = offset ? offset : &offset_local;
-    fields<CT> fds{};
-    from_stream(is, fmt, fds, abbrev, offptr);
-    if (!fds.ymd.ok())
-        is.setstate(ios::failbit);
-    if (!is.fail())
-    {
-        bool is_60_sec = fds.tod.seconds() == seconds{60};
-        if (is_60_sec)
-            fds.tod.seconds() -= seconds{1};
-        auto tmp = to_utc_time(sys_days(fds.ymd) - *offptr + fds.tod.to_duration());
-        if (is_60_sec)
-            tmp += seconds{1};
-        if (is_60_sec != is_leap_second(tmp).first || !fds.tod.in_conventional_range())
-        {
-            is.setstate(ios::failbit);
-            return is;
-        }
-        tp = time_point_cast<Duration>(tmp);
-    }
-    return is;
-}
-
 // tai_clock
 
 class tai_clock
@@ -2523,6 +2490,40 @@ to_utc_time(const gps_time<Duration>& t)
 {
     return gps_clock::to_utc(t);
 }
+
+template <class Duration, class CharT, class Traits, class Alloc = std::allocator<CharT>>
+std::basic_istream<CharT, Traits>&
+from_stream(std::basic_istream<CharT, Traits>& is, const CharT* fmt,
+            utc_time<Duration>& tp, std::basic_string<CharT, Traits, Alloc>* abbrev = nullptr,
+            std::chrono::minutes* offset = nullptr)
+{
+    using namespace std;
+    using namespace std::chrono;
+    using CT = typename common_type<Duration, seconds>::type;
+    minutes offset_local{};
+    auto offptr = offset ? offset : &offset_local;
+    fields<CT> fds{};
+    from_stream(is, fmt, fds, abbrev, offptr);
+    if (!fds.ymd.ok())
+        is.setstate(ios::failbit);
+    if (!is.fail())
+    {
+        bool is_60_sec = fds.tod.seconds() == seconds{60};
+        if (is_60_sec)
+            fds.tod.seconds() -= seconds{1};
+        auto tmp = to_utc_time(sys_days(fds.ymd) - *offptr + fds.tod.to_duration());
+        if (is_60_sec)
+            tmp += seconds{1};
+        if (is_60_sec != is_leap_second(tmp).first || !fds.tod.in_conventional_range())
+        {
+            is.setstate(ios::failbit);
+            return is;
+        }
+        tp = time_point_cast<Duration>(tmp);
+    }
+    return is;
+}
+
 
 
 template <class Duration>
